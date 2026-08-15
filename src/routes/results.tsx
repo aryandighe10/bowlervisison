@@ -3,6 +3,7 @@ import { useEffect } from "react";
 import { CheckCircle2, AlertTriangle, Target, RotateCcw } from "lucide-react";
 import { PipelineStepper } from "@/components/PipelineStepper";
 import { ProtractorDial } from "@/components/ProtractorDial";
+import { SkeletonCanvas } from "@/components/SkeletonCanvas";
 import { clearAnalysis, useAnalysis } from "@/lib/analysis-store";
 
 export const Route = createFileRoute("/results")({
@@ -161,13 +162,17 @@ function ResultsPage() {
             <p className="text-[11px] uppercase tracking-[0.2em] text-muted-foreground">
               Skeleton visualization
             </p>
-            <div className="mt-3 flex min-h-[180px] items-center justify-center rounded-xl border border-dashed border-border px-4 py-8 text-center">
-              <p className="font-mono text-xs text-muted-foreground">
-                {frames && frames.length > 0
-                  ? `${frames.length} frames of landmark data received`
-                  : "No processed skeleton frames were returned by the backend."}
-              </p>
-            </div>
+            {frames && frames.length > 0 ? (
+              <div className="mt-3 flex justify-center">
+                <SkeletonCanvas frames={frames} />
+              </div>
+            ) : (
+              <div className="mt-3 flex min-h-[180px] items-center justify-center rounded-xl border border-dashed border-border px-4 py-8 text-center">
+                <p className="font-mono text-xs text-muted-foreground">
+                  No processed skeleton frames were returned by the backend.
+                </p>
+              </div>
+            )}
           </div>
         </section>
 
