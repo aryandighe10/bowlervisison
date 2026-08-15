@@ -32,7 +32,7 @@ const ALIGNMENT_MAP: Record<string, { label: string; tone: "green" | "gold" | "r
   significant_variation: { label: "Significant variation", tone: "red" },
 };
 
-function AlignmentCard({ title, value }: { title: string; value?: string }) {
+function AlignmentCard({ title, value }: { title: string; value?: string | undefined }) {
   const mapped = value ? ALIGNMENT_MAP[value] : undefined;
   const label = mapped?.label ?? (value ? value.replace(/_/g, " ") : "Not reported");
   const tone = mapped?.tone ?? "gold";
@@ -62,7 +62,7 @@ function FeedbackColumn({
   color,
 }: {
   title: string;
-  items?: string[];
+  items?: string[] | undefined;
   icon: typeof CheckCircle2;
   color: string;
 }) {
