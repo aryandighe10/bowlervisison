@@ -1,5 +1,8 @@
 import { useSyncExternalStore } from "react";
 
+export type PoseLandmark = { x: number; y: number; v?: number };
+export type PoseFrame = { frame: number; landmarks: PoseLandmark[] };
+
 export type AnalysisResult = {
   joint_angles?: {
     elbow?: number;
@@ -15,7 +18,7 @@ export type AnalysisResult = {
   strengths?: string[];
   improvements?: string[];
   recommendations?: string[];
-  frames?: unknown[];
+  frames?: PoseFrame[];
 };
 
 type State = {
@@ -67,3 +70,5 @@ export function getApiUrl(): string {
 export function saveApiUrl(url: string) {
   if (typeof window !== "undefined") window.localStorage.setItem(API_KEY, url);
 }
+
+
