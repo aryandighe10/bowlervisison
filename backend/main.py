@@ -38,6 +38,10 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+from datetime import datetime, timezone
+
+COMMIT = os.environ.get("RENDER_GIT_COMMIT", "local")[:7]
+analysis_history = []  # in-memory store of past analyses
 
 mp_pose = mp.solutions.pose
 LM = mp_pose.PoseLandmark
@@ -75,6 +79,14 @@ def classify(var, low, high):
 @app.get("/")
 def root():
     return {"status": "BowlingAI backend running"}
+
+@app.get("/health")
+def health():
+    return {"status": "ok", "commit": COMMIT}
+
+@app.get("/history")
+def get_history():
+    return analysis_history
 
 
 @app.post("/analyze")
@@ -227,7 +239,7 @@ async def analyze(video: UploadFile = File(...)):
         penalty = min(60, front_knee_var * 1.2 + trunk_var * 1.5 + shoulder_var + hip_var)
         score = round(max(35, 100 - penalty))
 
-        return {
+        result = {
             "joint_angles": {
                 "elbow": round(avg(elbow_angles), 1) if elbow_angles else None,
                 "front_knee": round(avg(front_knee_angles), 1) if front_knee_angles else None,
@@ -244,5 +256,15 @@ async def analyze(video: UploadFile = File(...)):
             "recommendations": recommendations,
             "frames": frame_landmarks,
         }
+
+        analysis_history.append({
+            "id": len(analysis_history) + 1,
+            "filename": video.filename,
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "score": score,
+            "joint_angles": result["joint_angles"],
+        })
+
+        return result
     finally:
         os.unlink(tmp_path)
