@@ -10,7 +10,7 @@ frontend already expects.
 import math
 import os
 import tempfile
-
+from datetime import datetime, timezone
 import cv2
 import numpy as np
 from fastapi import FastAPI, File, HTTPException, UploadFile
@@ -38,7 +38,7 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-from datetime import datetime, timezone
+
 
 COMMIT = os.environ.get("RENDER_GIT_COMMIT", "local")[:7]
 analysis_history = []  # in-memory store of past analyses
@@ -80,9 +80,11 @@ def classify(var, low, high):
 def root():
     return {"status": "BowlingAI backend running"}
 
+
 @app.get("/health")
 def health():
     return {"status": "ok", "commit": COMMIT}
+
 
 @app.get("/history")
 def get_history():
