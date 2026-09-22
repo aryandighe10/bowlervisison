@@ -37,3 +37,17 @@ jobs:
           docker run -d -p 8000:8000 -e RENDER_GIT_COMMIT=${{ github.sha }} bowlingai-backend
           sleep 5
           curl -f http://localhost:8000/health
+
+    frontend-build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - name: Lint
+        run: npm run lint
+      - name: Build
+        run: npm run build
