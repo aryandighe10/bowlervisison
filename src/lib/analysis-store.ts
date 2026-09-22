@@ -70,5 +70,3 @@ export function getApiUrl(): string {
 export function saveApiUrl(url: string) {
   if (typeof window !== "undefined") window.localStorage.setItem(API_KEY, url);
 }
-
-
