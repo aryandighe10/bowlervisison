@@ -38,7 +38,7 @@ jobs:
           sleep 5
           curl -f http://localhost:8000/health
 
-    frontend-build:
+  frontend-build:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
