@@ -60,7 +60,7 @@ export function useAnalysis(): State {
 }
 
 const API_KEY = "bowlingai_api_url";
-export const DEFAULT_API_URL = "http://localhost:8000";
+export const DEFAULT_API_URL = import.meta.env.VITE_API_URL || "http://localhost:8000";
 
 export function getApiUrl(): string {
   if (typeof window === "undefined") return DEFAULT_API_URL;
