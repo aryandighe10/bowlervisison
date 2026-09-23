@@ -83,9 +83,7 @@ function CommitFooter() {
   }, []);
 
   return (
-    <footer className="py-4 text-center text-xs text-muted-foreground">
-      commit {commit}
-    </footer>
+    <footer className="py-4 text-center text-xs text-muted-foreground">commit {commit}</footer>
   );
 }
 export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()({
