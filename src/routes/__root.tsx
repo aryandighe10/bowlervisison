@@ -7,7 +7,8 @@ import {
   HeadContent,
   Scripts,
 } from "@tanstack/react-router";
-import { useEffect, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
+import { getApiUrl } from "../lib/analysis-store";
 
 import appCss from "../styles.css?url";
 import { reportLovableError } from "../lib/lovable-error-reporting";
@@ -71,7 +72,22 @@ function ErrorComponent({ error, reset }: { error: Error; reset: () => void }) {
     </div>
   );
 }
+function CommitFooter() {
+  const [commit, setCommit] = useState("local");
 
+  useEffect(() => {
+    fetch(`${getApiUrl()}/health`)
+      .then((res) => res.json())
+      .then((data) => setCommit(data.commit))
+      .catch(() => {});
+  }, []);
+
+  return (
+    <footer className="py-4 text-center text-xs text-muted-foreground">
+      commit {commit}
+    </footer>
+  );
+}
 export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()({
   head: () => ({
     meta: [
@@ -127,6 +143,7 @@ function RootComponent() {
     <QueryClientProvider client={queryClient}>
       {/* Required: nested routes render here. Removing <Outlet /> breaks all child routes. */}
       <Outlet />
+      <CommitFooter />
     </QueryClientProvider>
   );
 }
