@@ -21,7 +21,7 @@ def test_analyze_rejects_bad_extension():
 def test_calc_angle_right_angle():
     # a=(0,1), b=(0,0), c=(1,0) -> 90 degree angle at b
     angle = calc_angle((0, 1), (0, 0), (1, 0))
-    assert 89 < angle < 90
+    assert 89 < angle < 91
 
 
 def test_history_starts_as_list():
