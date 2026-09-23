@@ -51,3 +51,13 @@ jobs:
         run: npm run lint
       - name: Build
         run: npm run build
+  
+  deploy:
+    needs: [backend-build, frontend-build]
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger backend deploy
+        run: curl -fsS -X POST "${{ secrets.RENDER_BACKEND_DEPLOY_HOOK }}&ref=${{ github.sha }}"
+      - name: Trigger frontend deploy
+        run: curl -fsS -X POST "${{ secrets.RENDER_FRONTEND_DEPLOY_HOOK }}&ref=${{ github.sha }}"
