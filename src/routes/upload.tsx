@@ -2,6 +2,7 @@ import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
 import { useRef, useState } from "react";
 import { AlertTriangle, ChevronDown, Loader2, Settings2, Trash2, UploadCloud } from "lucide-react";
 import { PipelineStepper } from "@/components/PipelineStepper";
+import { RecentAnalyses } from "@/components/RecentAnalyses";
 import {
   DEFAULT_API_URL,
   getApiUrl,
@@ -43,6 +44,7 @@ function UploadPage() {
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [dragging, setDragging] = useState(false);
 
   function acceptFile(f: File | undefined | null) {
     if (!f) return;
@@ -138,7 +140,7 @@ function UploadPage() {
         </div>
 
         <div className="mt-6">
-          <PipelineStepper current={1} />
+          <PipelineStepper current={loading ? 2 : 1} />
         </div>
 
         <h1 className="mt-10 text-3xl text-foreground">Upload Bowling Video</h1>
@@ -183,7 +185,10 @@ function UploadPage() {
         </div>
 
         {error && (
-          <div className="mt-6 flex items-start gap-3 rounded-xl border border-[var(--alert)]/50 bg-[var(--alert)]/10 px-4 py-3">
+          <div
+            role="alert"
+            className="mt-6 flex items-start gap-3 rounded-xl border border-[var(--alert)]/50 bg-[var(--alert)]/10 px-4 py-3"
+          >
             <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-[var(--alert)]" />
             <p className="text-sm text-foreground">{error}</p>
           </div>
@@ -203,12 +208,19 @@ function UploadPage() {
             <button
               type="button"
               onClick={() => inputRef.current?.click()}
-              onDragOver={(e) => e.preventDefault()}
+              onDragOver={(e) => {
+                e.preventDefault();
+                setDragging(true);
+              }}
+              onDragLeave={() => setDragging(false)}
               onDrop={(e) => {
                 e.preventDefault();
+                setDragging(false);
                 acceptFile(e.dataTransfer.files?.[0]);
               }}
-              className="flex w-full flex-col items-center gap-3 rounded-xl border border-dashed border-border px-6 py-14 transition-colors hover:border-primary hover:bg-[var(--surface-2)]"
+              className={`flex w-full flex-col items-center gap-3 rounded-xl border border-dashed px-6 py-14 transition-colors hover:border-primary hover:bg-[var(--surface-2)] ${
+                dragging ? "border-primary bg-[var(--surface-2)]" : "border-border"
+              }`}
             >
               <UploadCloud className="h-7 w-7 text-primary" />
               <span className="font-display text-sm uppercase tracking-[0.18em] text-foreground">
@@ -225,7 +237,7 @@ function UploadPage() {
               />
               <div className="mt-4 flex items-center justify-between gap-4">
                 <span className="truncate font-mono text-xs text-muted-foreground">
-                  {file.name}
+                  {file.name} · {(file.size / (1024 * 1024)).toFixed(1)} MB
                 </span>
                 <button
                   type="button"
@@ -246,8 +258,15 @@ function UploadPage() {
           className="mt-6 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-primary px-6 py-3 font-display text-sm uppercase tracking-[0.18em] text-primary-foreground transition-colors hover:bg-[var(--primary-soft)] disabled:opacity-60"
         >
           {loading && <Loader2 className="h-4 w-4 animate-spin" />}
-          {loading ? "Analyzing…" : "Analyze Bowling Action"}
+          {loading ? "Detecting pose and analyzing…" : "Analyze Bowling Action"}
         </button>
+        {loading && (
+          <p className="mt-3 text-center font-mono text-xs text-faint">
+            Longer clips can take a minute, especially if the server has just woken up.
+          </p>
+        )}
+
+        <RecentAnalyses refreshKey={loading} />
       </div>
     </main>
   );

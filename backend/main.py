@@ -16,6 +16,9 @@ import numpy as np
 from fastapi import FastAPI, File, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 
+from pose_math import calc_angle, detect_bowling_side, front_leg_side, smooth_points
+from sarvam_api import router as sarvam_router
+
 try:
     import mediapipe as mp
 except ImportError as e:  # pragma: no cover
@@ -40,6 +43,8 @@ app.add_middleware(
 )
 
 
+app.include_router(sarvam_router)
+
 COMMIT = os.environ.get("RENDER_GIT_COMMIT", "local")[:7]
 analysis_history = []  # in-memory store of past analyses
 
@@ -50,13 +55,14 @@ ACCEPTED_EXT = (".mp4", ".mov", ".avi")
 MAX_SAMPLE_FRAMES = 60  # cap processed frames so the MVP stays fast
 
 
-def calc_angle(a, b, c):
-    """Angle at point b, formed by rays b->a and b->c, in degrees."""
-    a, b, c = np.array(a), np.array(b), np.array(c)
-    ba, bc = a - b, c - b
-    cosine = np.dot(ba, bc) / (np.linalg.norm(ba) * np.linalg.norm(bc) + 1e-9)
-    cosine = np.clip(cosine, -1.0, 1.0)
-    return math.degrees(math.acos(cosine))
+TRACKED = {
+    "l_sh": LM.LEFT_SHOULDER, "r_sh": LM.RIGHT_SHOULDER,
+    "l_el": LM.LEFT_ELBOW, "r_el": LM.RIGHT_ELBOW,
+    "l_wr": LM.LEFT_WRIST, "r_wr": LM.RIGHT_WRIST,
+    "l_hip": LM.LEFT_HIP, "r_hip": LM.RIGHT_HIP,
+    "l_kn": LM.LEFT_KNEE, "r_kn": LM.RIGHT_KNEE,
+    "l_an": LM.LEFT_ANKLE, "r_an": LM.RIGHT_ANKLE,
+}
 
 
 def xy(landmarks, idx, w, h):
@@ -115,8 +121,7 @@ async def analyze(video: UploadFile = File(...)):
 
         step = max(1, total_frames // MAX_SAMPLE_FRAMES)
 
-        elbow_angles, front_knee_angles, rear_knee_angles = [], [], []
-        trunk_angles, shoulder_slopes, hip_slopes = [], [], []
+        tracks = {name: [] for name in TRACKED}
         frame_landmarks = []
         detected_count = 0
         frame_idx = 0
@@ -138,49 +143,18 @@ async def analyze(video: UploadFile = File(...)):
                         detected_count += 1
                         lm = result.pose_landmarks.landmark
 
-                        l_sh, r_sh = xy(lm, LM.LEFT_SHOULDER, w, h), xy(lm, LM.RIGHT_SHOULDER, w, h)
-                        l_el, r_el = xy(lm, LM.LEFT_ELBOW, w, h), xy(lm, LM.RIGHT_ELBOW, w, h)
-                        l_wr, r_wr = xy(lm, LM.LEFT_WRIST, w, h), xy(lm, LM.RIGHT_WRIST, w, h)
-                        l_hip, r_hip = xy(lm, LM.LEFT_HIP, w, h), xy(lm, LM.RIGHT_HIP, w, h)
-                        l_kn, r_kn = xy(lm, LM.LEFT_KNEE, w, h), xy(lm, LM.RIGHT_KNEE, w, h)
-                        l_an, r_an = xy(lm, LM.LEFT_ANKLE, w, h), xy(lm, LM.RIGHT_ANKLE, w, h)
+                        for name, idx in TRACKED.items():
+                            tracks[name].append(xy(lm, idx, w, h))
 
-                        # Bowling arm heuristic: whichever wrist sits higher (smaller y) is
-                        # taken as the active arm for that frame.
-                        if r_wr[1] < l_wr[1]:
-                            elbow_angles.append(calc_angle(r_sh, r_el, r_wr))
-                        else:
-                            elbow_angles.append(calc_angle(l_sh, l_el, l_wr))
-
-                        # Front-leg heuristic: whichever ankle sits further from the hip
-                        # midline horizontally is treated as the front (landing) leg.
-                        hip_mid_x = (l_hip[0] + r_hip[0]) / 2
-                        if abs(l_an[0] - hip_mid_x) >= abs(r_an[0] - hip_mid_x):
-                            front_knee_angles.append(calc_angle(l_hip, l_kn, l_an))
-                            rear_knee_angles.append(calc_angle(r_hip, r_kn, r_an))
-                        else:
-                            front_knee_angles.append(calc_angle(r_hip, r_kn, r_an))
-                            rear_knee_angles.append(calc_angle(l_hip, l_kn, l_an))
-
-                        # Trunk inclination: angle of the shoulder-hip midline from vertical.
-                        sh_mid = ((l_sh[0] + r_sh[0]) / 2, (l_sh[1] + r_sh[1]) / 2)
-                        hip_mid = (hip_mid_x, (l_hip[1] + r_hip[1]) / 2)
-                        dx, dy = sh_mid[0] - hip_mid[0], sh_mid[1] - hip_mid[1]
-                        trunk_angles.append(math.degrees(math.atan2(abs(dx), abs(dy) + 1e-9)))
-
-                        shoulder_slopes.append(math.degrees(math.atan2(r_sh[1] - l_sh[1], r_sh[0] - l_sh[0])))
-                        hip_slopes.append(math.degrees(math.atan2(r_hip[1] - l_hip[1], r_hip[0] - l_hip[0])))
-
-                        if len(frame_landmarks) < 40:
-                            frame_landmarks.append(
-                                {
-                                    "frame": frame_idx,
-                                    "landmarks": [
-                                        {"x": round(p.x, 4), "y": round(p.y, 4), "v": round(p.visibility, 2)}
-                                        for p in lm
-                                    ],
-                                }
-                            )
+                        frame_landmarks.append(
+                            {
+                                "frame": frame_idx,
+                                "landmarks": [
+                                    {"x": round(p.x, 4), "y": round(p.y, 4), "v": round(p.visibility, 2)}
+                                    for p in lm
+                                ],
+                            }
+                        )
 
                 frame_idx += 1
 
@@ -196,6 +170,31 @@ async def analyze(video: UploadFile = File(...)):
                 status_code=422,
                 detail="Too few frames had a detectable pose. Check lighting, framing and video quality.",
             )
+
+        # Smooth each landmark track to remove pose-detector jitter, then decide the
+        # bowling arm once for the whole clip (and the landing leg from it) instead of
+        # guessing per frame, which mixed left and right limbs.
+        t = {name: smooth_points(pts) for name, pts in tracks.items()}
+        bowling_arm = detect_bowling_side(t["l_wr"], t["r_wr"])
+        front_leg = front_leg_side(bowling_arm)
+        arm_p, front_p = bowling_arm[0], front_leg[0]
+        rear_p = "l" if front_p == "r" else "r"
+
+        elbow_angles, front_knee_angles, rear_knee_angles = [], [], []
+        trunk_angles, shoulder_slopes, hip_slopes = [], [], []
+        for i in range(detected_count):
+            elbow_angles.append(calc_angle(t[f"{arm_p}_sh"][i], t[f"{arm_p}_el"][i], t[f"{arm_p}_wr"][i]))
+            front_knee_angles.append(calc_angle(t[f"{front_p}_hip"][i], t[f"{front_p}_kn"][i], t[f"{front_p}_an"][i]))
+            rear_knee_angles.append(calc_angle(t[f"{rear_p}_hip"][i], t[f"{rear_p}_kn"][i], t[f"{rear_p}_an"][i]))
+
+            l_sh, r_sh, l_hip, r_hip = t["l_sh"][i], t["r_sh"][i], t["l_hip"][i], t["r_hip"][i]
+            # Trunk inclination: angle of the shoulder-hip midline from vertical.
+            dx = (l_sh[0] + r_sh[0]) / 2 - (l_hip[0] + r_hip[0]) / 2
+            dy = (l_sh[1] + r_sh[1]) / 2 - (l_hip[1] + r_hip[1]) / 2
+            trunk_angles.append(math.degrees(math.atan2(abs(dx), abs(dy) + 1e-9)))
+
+            shoulder_slopes.append(math.degrees(math.atan2(r_sh[1] - l_sh[1], r_sh[0] - l_sh[0])))
+            hip_slopes.append(math.degrees(math.atan2(r_hip[1] - l_hip[1], r_hip[0] - l_hip[0])))
 
         def avg(values):
             return sum(values) / len(values) if values else None
@@ -252,6 +251,7 @@ async def analyze(video: UploadFile = File(...)):
                 "shoulder": shoulder_align,
                 "hip": hip_align,
             },
+            "bowling_arm": bowling_arm,
             "score": score,
             "strengths": strengths,
             "improvements": improvements,
@@ -264,6 +264,7 @@ async def analyze(video: UploadFile = File(...)):
             "filename": video.filename,
             "timestamp": datetime.now(timezone.utc).isoformat(),
             "score": score,
+            "bowling_arm": bowling_arm,
             "joint_angles": result["joint_angles"],
         })
 
