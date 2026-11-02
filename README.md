@@ -16,6 +16,7 @@ A user uploads a short video of their bowling action. The backend runs MediaPipe
 - `POST /analyze` — accepts a video file, runs pose detection, computes a score, and **persists** the result
 - `GET /history` — returns the list of all past analyses (server-side data, not static)
 - `GET /health` — health check, also returns the currently running commit SHA
+- `POST /translate`, `POST /speak`, `POST /ask` — [Sarvam AI](https://docs.sarvam.ai) powered language support: the feedback can be translated into 10 Indian languages, read aloud, and the user can ask questions about their analysis by typing or speaking. Requires `SARVAM_API_KEY` (set it as an environment variable on Render, or in `backend/.env` locally — never commit it)
 - A footer on every page shows the live commit ID, proving the deployed code matches the latest passing pipeline run
 
 ---

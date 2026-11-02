@@ -21,7 +21,7 @@ jobs:
           cache-dependency-path: backend/requirements.txt
       - run: pip install -r requirements.txt
       - name: Lint
-        run: flake8 --max-line-length=120 main.py test_main.py
+        run: flake8 --max-line-length=120 main.py pose_math.py sarvam_api.py test_main.py test_sarvam_api.py
       - name: Test
         run: pytest -v
 

@@ -14,6 +14,7 @@ export type AnalysisResult = {
     shoulder?: string;
     hip?: string;
   };
+  bowling_arm?: "left" | "right";
   score?: number;
   strengths?: string[];
   improvements?: string[];
